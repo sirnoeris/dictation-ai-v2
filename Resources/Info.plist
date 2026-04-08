@@ -3,8 +3,6 @@
   "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-
-    <!-- App identity -->
     <key>CFBundleName</key>
     <string>DictationAI</string>
     <key>CFBundleDisplayName</key>
@@ -19,33 +17,19 @@
     <string>$(EXECUTABLE_NAME)</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
-
-    <!-- Menu-bar only — suppresses Dock icon and App Switcher entry -->
     <key>LSUIElement</key>
     <true/>
-
-    <!-- macOS minimum version -->
     <key>LSMinimumSystemVersion</key>
     <string>14.0</string>
-
-    <!-- Privacy usage strings (required for Mac App Store / notarisation) -->
     <key>NSMicrophoneUsageDescription</key>
     <string>Dictation AI needs microphone access to record your voice.</string>
-
     <key>NSSpeechRecognitionUsageDescription</key>
-    <string>Dictation AI uses on-device speech recognition to preview your dictation.</string>
-
-    <!-- Accessibility note: shown in System Settings → Privacy → Accessibility -->
+    <string>Dictation AI uses on-device speech recognition to transcribe your dictation.</string>
     <key>NSAppleEventsUsageDescription</key>
     <string>Dictation AI needs Accessibility access to paste transcribed text at your cursor.</string>
-
-    <!-- Single-instance enforcement -->
     <key>LSMultipleInstancesProhibited</key>
     <true/>
-
-    <!-- App icon -->
     <key>CFBundleIconName</key>
     <string>AppIcon</string>
-
 </dict>
 </plist>
