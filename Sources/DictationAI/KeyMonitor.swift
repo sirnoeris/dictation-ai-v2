@@ -3,9 +3,8 @@ import Carbon
 
 // MARK: - KeyMonitor
 // Uses CGEventTap for hold-to-talk (Fn/Globe flagsChanged) and key-learning.
-// Uses NSEvent.addGlobalMonitorForEvents for toggle mode (Ctrl+Opt+Space).
-// The NSEvent monitor does NOT require Accessibility permission —
-// only Input Monitoring (much easier to grant than Accessibility).
+// Uses Carbon RegisterEventHotKey for toggle mode (Ctrl+Opt+Space).
+// RegisterEventHotKey requires ZERO permissions — no Accessibility, no Input Monitoring.
 
 final class KeyMonitor {
 
@@ -23,7 +22,8 @@ final class KeyMonitor {
 
     private var eventTap: CFMachPort?
     private var runLoopSource: CFRunLoopSource?
-    private var toggleMonitor: Any?           // NSEvent global monitor for toggle
+    private var hotKeyRef: EventHotKeyRef?          // Carbon hot key for toggle
+    private var hotKeyEventHandler: EventHandlerRef?  // Carbon event handler
 
     private var currentMode: RecordingMode = .hold
     private var currentKeyCode: Int        = 63   // Globe/Fn default
@@ -61,28 +61,51 @@ final class KeyMonitor {
         isLearningKey = false
     }
 
-    // MARK: - NSEvent Toggle Monitor (Ctrl+Option+Space)
-    // NSEvent.addGlobalMonitorForEvents observes without consuming events and
-    // does not require Accessibility — only Input Monitoring in System Settings.
+    // MARK: - Carbon Hot Key (Ctrl+Option+Space, no permissions required)
+    // Carbon RegisterEventHotKey works in any build without code-signing or
+    // system permission prompts — unlike CGEventTap (Accessibility) or
+    // NSEvent global monitors (Input Monitoring).
+    //
+    // Modifier constants from Carbon/Events.h:
+    //   optionKey  = 0x0800   controlKey = 0x1000
 
     private func installToggleMonitor() {
         removeToggleMonitor()
         guard currentMode == .toggle else { return }
 
-        toggleMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { [weak self] event in
-            guard let self else { return }
-            // Ctrl+Option+Space: keyCode 49, exactly Control+Option (no Cmd/Shift)
-            let maskedFlags = event.modifierFlags.intersection([.control, .option, .command, .shift])
-            if event.keyCode == 49 && maskedFlags == [.control, .option] {
-                DispatchQueue.main.async { self.onToggle?() }
-            }
+        var hotKeyID = EventHotKeyID()
+        hotKeyID.signature = 0x44544149  // 'DTAI'
+        hotKeyID.id        = 1
+
+        let status = RegisterEventHotKey(
+            49,                               // kVK_Space
+            UInt32(optionKey | controlKey),   // ⌃⌥
+            hotKeyID,
+            GetApplicationEventTarget(),
+            0, &hotKeyRef
+        )
+        guard status == noErr else {
+            print("[KeyMonitor] RegisterEventHotKey failed: \(status)")
+            return
         }
+
+        var spec = EventTypeSpec(
+            eventClass: OSType(kEventClassKeyboard),
+            eventKind:  UInt32(kEventHotKeyPressed)
+        )
+        let ptr = Unmanaged.passUnretained(self).toOpaque()
+        InstallEventHandler(GetApplicationEventTarget(),
+                            hotKeyEventCallback, 1, &spec, ptr, &hotKeyEventHandler)
     }
 
     private func removeToggleMonitor() {
-        if let monitor = toggleMonitor {
-            NSEvent.removeMonitor(monitor)
-            toggleMonitor = nil
+        if let ref = hotKeyRef {
+            UnregisterEventHotKey(ref)
+            hotKeyRef = nil
+        }
+        if let handler = hotKeyEventHandler {
+            RemoveEventHandler(handler)
+            hotKeyEventHandler = nil
         }
     }
 
@@ -224,7 +247,21 @@ final class KeyMonitor {
     }
 }
 
-// MARK: - C-compatible tap callback
+// MARK: - C-compatible Carbon hot key callback
+// Must be a free function (not a closure) to satisfy @convention(c) requirement.
+
+private func hotKeyEventCallback(
+    _ callRef:  EventHandlerCallRef?,
+    _ event:    EventRef?,
+    _ userData: UnsafeMutableRawPointer?
+) -> OSStatus {
+    guard let userData else { return OSStatus(eventNotHandledErr) }
+    let monitor = Unmanaged<KeyMonitor>.fromOpaque(userData).takeUnretainedValue()
+    DispatchQueue.main.async { monitor.onToggle?() }
+    return noErr
+}
+
+// MARK: - C-compatible CGEventTap callback
 
 private func keyMonitorCallback(
     proxy:    CGEventTapProxy,

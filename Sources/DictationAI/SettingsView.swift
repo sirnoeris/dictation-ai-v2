@@ -168,41 +168,63 @@ struct SettingsView: View {
                 }
             }
 
-            SettingsRow(label: settings.recordingMode == .hold ? "Hold key" : "Toggle key") {
-                HStack(spacing: 8) {
-                    Text(isLearningKey ? "Press a key…" : learnButtonLabel)
-                        .font(.system(.body, design: .monospaced))
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 5)
-                        .background(Color(NSColor.controlBackgroundColor))
-                        .cornerRadius(6)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 6)
-                                .strokeBorder(isLearningKey ? Color.accentColor : Color.secondary.opacity(0.3))
-                        )
+            if settings.recordingMode == .hold {
+                // Configurable hold key
+                SettingsRow(label: "Hold key") {
+                    HStack(spacing: 8) {
+                        Text(isLearningKey ? "Press a key…" : learnButtonLabel)
+                            .font(.system(.body, design: .monospaced))
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 5)
+                            .background(Color(NSColor.controlBackgroundColor))
+                            .cornerRadius(6)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 6)
+                                    .strokeBorder(isLearningKey ? Color.accentColor : Color.secondary.opacity(0.3))
+                            )
 
-                    Button(isLearningKey ? "Cancel" : "Change…") {
-                        if isLearningKey {
-                            isLearningKey = false
-                            KeyMonitor.shared.cancelLearning()
-                        } else {
-                            isLearningKey = true
-                            KeyMonitor.shared.beginLearning()
+                        Button(isLearningKey ? "Cancel" : "Change…") {
+                            if isLearningKey {
+                                isLearningKey = false
+                                KeyMonitor.shared.cancelLearning()
+                            } else {
+                                isLearningKey = true
+                                KeyMonitor.shared.beginLearning()
+                            }
                         }
+                        .buttonStyle(.bordered)
+                        .controlSize(.small)
                     }
-                    .buttonStyle(.bordered)
-                    .controlSize(.small)
                 }
-            }
 
-            if settings.holdKeyCode == 63 {
-                HStack(spacing: 6) {
-                    Image(systemName: "info.circle")
-                        .font(.caption)
-                        .foregroundStyle(Color.accentColor)
-                    Text("For Globe/Fn: set System Settings → Keyboard → Press Globe key to → Do Nothing")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                if settings.holdKeyCode == 63 {
+                    HStack(spacing: 6) {
+                        Image(systemName: "info.circle")
+                            .font(.caption)
+                            .foregroundStyle(Color.accentColor)
+                        Text("For Globe/Fn: set System Settings → Keyboard → Press Globe key to → Do Nothing")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            } else {
+                // Fixed toggle shortcut — Carbon RegisterEventHotKey, no permissions needed
+                SettingsRow(label: "Toggle key") {
+                    HStack(spacing: 8) {
+                        Text("⌃⌥Space")
+                            .font(.system(.body, design: .monospaced))
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 5)
+                            .background(Color(NSColor.controlBackgroundColor))
+                            .cornerRadius(6)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 6)
+                                    .strokeBorder(Color.secondary.opacity(0.3))
+                            )
+                        Text("(fixed shortcut)")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
                 }
             }
         }
