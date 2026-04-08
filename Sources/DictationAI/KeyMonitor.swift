@@ -2,10 +2,10 @@ import Cocoa
 import Carbon
 
 // MARK: - KeyMonitor
-// Uses CGEventTap to detect:
-//   • Hold-to-talk: Fn/Globe (keycode 63) flagsChanged press/release
-//   • Toggle mode:  any configured keycode
-//   • Key-learning: "press a key" flow for Settings
+// Uses CGEventTap for hold-to-talk (Fn/Globe flagsChanged) and key-learning.
+// Uses NSEvent.addGlobalMonitorForEvents for toggle mode (Ctrl+Opt+Space).
+// The NSEvent monitor does NOT require Accessibility permission —
+// only Input Monitoring (much easier to grant than Accessibility).
 
 final class KeyMonitor {
 
@@ -23,6 +23,7 @@ final class KeyMonitor {
 
     private var eventTap: CFMachPort?
     private var runLoopSource: CFRunLoopSource?
+    private var toggleMonitor: Any?           // NSEvent global monitor for toggle
 
     private var currentMode: RecordingMode = .hold
     private var currentKeyCode: Int        = 63   // Globe/Fn default
@@ -42,12 +43,14 @@ final class KeyMonitor {
         currentMode    = mode
         currentKeyCode = keyCode
         installTap()
+        installToggleMonitor()
     }
 
     func updateMode(_ mode: RecordingMode, keyCode: Int) {
         currentMode    = mode
         currentKeyCode = keyCode
         holdActive     = false
+        installToggleMonitor()
     }
 
     func beginLearning() {
@@ -56,6 +59,31 @@ final class KeyMonitor {
 
     func cancelLearning() {
         isLearningKey = false
+    }
+
+    // MARK: - NSEvent Toggle Monitor (Ctrl+Option+Space)
+    // NSEvent.addGlobalMonitorForEvents observes without consuming events and
+    // does not require Accessibility — only Input Monitoring in System Settings.
+
+    private func installToggleMonitor() {
+        removeToggleMonitor()
+        guard currentMode == .toggle else { return }
+
+        toggleMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            guard let self else { return }
+            // Ctrl+Option+Space: keyCode 49, exactly Control+Option (no Cmd/Shift)
+            let maskedFlags = event.modifierFlags.intersection([.control, .option, .command, .shift])
+            if event.keyCode == 49 && maskedFlags == [.control, .option] {
+                DispatchQueue.main.async { self.onToggle?() }
+            }
+        }
+    }
+
+    private func removeToggleMonitor() {
+        if let monitor = toggleMonitor {
+            NSEvent.removeMonitor(monitor)
+            toggleMonitor = nil
+        }
     }
 
     // MARK: - Event Tap
@@ -95,6 +123,7 @@ final class KeyMonitor {
         eventTap      = nil
         runLoopSource = nil
         holdActive    = false
+        removeToggleMonitor()
     }
 
     // MARK: - Event Handling (called from C callback)
@@ -141,11 +170,8 @@ final class KeyMonitor {
             return event
         }
 
-        // ── Toggle mode ───────────────────────────────────────────────────────
-        if currentMode == .toggle && type == .keyDown && keyCode == currentKeyCode {
-            DispatchQueue.main.async { self.onToggle?() }
-            return nil  // consume
-        }
+        // Toggle mode is handled by the NSEvent global monitor (see installToggleMonitor).
+        // CGEventTap only serves hold-to-talk and key-learning.
 
         return event
     }

@@ -87,10 +87,15 @@ final class WhisperTranscriber: ObservableObject {
             decodeOptions: options
         )
 
-        // Flatten all segments into a single string
+        // Flatten segments, stripping WhisperKit no-speech special tokens.
+        // skipSpecialTokens=true handles most cases, but some model versions
+        // still emit [_blank_audio] / [BLANK_AUDIO] as segment text.
+        let blankTokens: Set<String> = ["[_blank_audio]", "[blank_audio]"]
+
         let text = results
             .flatMap { $0.segments }
-            .map { $0.text }
+            .map { $0.text.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !blankTokens.contains($0.lowercased()) }
             .joined(separator: " ")
             .trimmingCharacters(in: .whitespacesAndNewlines)
 

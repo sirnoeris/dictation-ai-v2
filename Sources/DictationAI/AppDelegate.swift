@@ -128,7 +128,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             object:  nil,
             queue:   .main
         ) { [weak self] _ in
-            self?.openSettings()
+            Task { @MainActor [weak self] in
+                self?.openSettings()
+            }
         }
     }
 
@@ -167,13 +169,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private func runPipeline(audioFileURL: URL?) async {
         defer {
             updateTrayIcon()
-            // Auto-hide pill after 2.5 s unless it was an error
+            // Auto-hide pill after 2.5 s unless it was an error.
+            // Task { @MainActor } + Task.sleep replaces DispatchQueue.asyncAfter
+            // to satisfy Swift 6 actor-isolation rules.
             let delay: Double = appState.state.isError ? 4.0 : 2.5
-            DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
-                self.pillController.hide()
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                    self.appState.transition(to: .idle)
-                }
+            Task { @MainActor [weak self] in
+                try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+                self?.pillController.hide()
+                try? await Task.sleep(nanoseconds: 300_000_000)
+                self?.appState.transition(to: .idle)
             }
         }
 
