@@ -72,9 +72,10 @@ final class PasteService {
     // MARK: - Accessibility
 
     func checkAccessibility() -> Bool {
-        AXIsProcessTrustedWithOptions(
-            [kAXTrustedCheckOptionPrompt: false] as CFDictionary
-        )
+        // Passing nil just checks trust status without triggering a system prompt.
+        // kAXTrustedCheckOptionPrompt changed to Unmanaged<CFString> in newer SDKs
+        // so we avoid it here and show our own alert in requestAccessibilityIfNeeded().
+        AXIsProcessTrustedWithOptions(nil)
     }
 
     func requestAccessibilityIfNeeded() {

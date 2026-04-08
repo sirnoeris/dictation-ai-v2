@@ -34,16 +34,20 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             await WhisperTranscriber.shared.loadModel(settings.whisperModel)
         }
 
-        // First launch: open settings if no API key
+        // First launch: open settings if no API key.
+        // Use Task instead of DispatchQueue.asyncAfter — DispatchQueue closures
+        // are not @MainActor-isolated in Swift 6, causing the compiler error.
         if !settings.hasXAIKey {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
-                self.openSettings()
+            Task { @MainActor [weak self] in
+                try? await Task.sleep(nanoseconds: 800_000_000)
+                self?.openSettings()
             }
         }
 
         // Request accessibility if auto-paste is on
         if settings.autoPaste {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+            Task { @MainActor in
+                try? await Task.sleep(nanoseconds: 1_500_000_000)
                 PasteService.shared.requestAccessibilityIfNeeded()
             }
         }

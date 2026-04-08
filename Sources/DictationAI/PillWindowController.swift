@@ -70,7 +70,8 @@ final class PillWindowController {
         let pillView = PillView(
             appState: appState,
             settings: settings,
-            onSettingsTap: { [weak self] in
+            onSettingsTap: {
+                // self not needed here — post to NotificationCenter directly
                 NotificationCenter.default.post(name: .openSettings, object: nil)
             }
         )
