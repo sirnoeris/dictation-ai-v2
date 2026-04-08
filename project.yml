@@ -28,7 +28,7 @@ settings:
 packages:
   WhisperKit:
     url: https://github.com/argmaxinc/WhisperKit.git
-    minVersion: 0.9.0
+    from: "0.9.0"
 
 targets:
   DictationAI:
