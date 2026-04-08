@@ -14,7 +14,7 @@ final class WhisperTranscriber: ObservableObject {
 
     private var whisper: WhisperKit?
 
-    enum ModelState {
+    enum ModelState: Equatable {
         case notLoaded
         case downloading(Double)
         case loading
