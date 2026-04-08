@@ -40,6 +40,11 @@ final class AudioRecorder {
     /// Target sample rate for WhisperKit (must be 16 kHz).
     private let targetSampleRate: Double = 16_000
 
+    // Cache the converter to avoid re-creating it on every audio buffer.
+    // Bug fix: AVAudioConverter construction on the real-time thread is expensive.
+    private var cachedConverter: AVAudioConverter?
+    private var targetFormat: AVAudioFormat?
+
     // Callback for level updates → drives waveform animation.
     var onLevelUpdate: ((Float) -> Void)?
 
@@ -62,11 +67,16 @@ final class AudioRecorder {
             return
         }
 
+        // Create converter once — reused every callback for efficiency.
+        if inputFormat.sampleRate != targetSampleRate || inputFormat.channelCount != 1 {
+            cachedConverter = AVAudioConverter(from: inputFormat, to: monoFormat)
+        }
+        targetFormat = monoFormat
+
         // Install a tap — buffers arrive in native hardware format.
-        // We install the tap in the hardware format and convert in the callback.
         input.installTap(onBus: 0, bufferSize: 4096, format: inputFormat) { [weak self] buffer, _ in
             guard let self, self.isRunning else { return }
-            self.process(buffer: buffer, inputFormat: inputFormat, targetFormat: monoFormat)
+            self.process(buffer: buffer, inputFormat: inputFormat)
         }
 
         do {
@@ -105,14 +115,13 @@ final class AudioRecorder {
 
     // MARK: - Processing
 
-    private func process(buffer: AVAudioPCMBuffer,
-                         inputFormat: AVAudioFormat,
-                         targetFormat: AVAudioFormat) {
-        // Convert to 16 kHz mono if needed
+    private func process(buffer: AVAudioPCMBuffer, inputFormat: AVAudioFormat) {
+        guard let target = targetFormat else { return }
+        // Convert to 16 kHz mono if needed, using cached converter
         let converted: AVAudioPCMBuffer
         if inputFormat.sampleRate == targetSampleRate && inputFormat.channelCount == 1 {
             converted = buffer
-        } else if let c = convert(buffer: buffer, from: inputFormat, to: targetFormat) {
+        } else if let c = convertUsing(cachedConverter, buffer: buffer, target: target) {
             converted = c
         } else {
             return
@@ -136,12 +145,12 @@ final class AudioRecorder {
 
     // MARK: - Audio Format Conversion
 
-    private func convert(buffer: AVAudioPCMBuffer,
-                         from source: AVAudioFormat,
-                         to target: AVAudioFormat) -> AVAudioPCMBuffer? {
-        guard let converter = AVAudioConverter(from: source, to: target) else { return nil }
+    private func convertUsing(_ converter: AVAudioConverter?,
+                              buffer: AVAudioPCMBuffer,
+                              target: AVAudioFormat) -> AVAudioPCMBuffer? {
+        guard let converter else { return nil }
 
-        let ratio = target.sampleRate / source.sampleRate
+        let ratio = target.sampleRate / buffer.format.sampleRate
         let outputFrames = AVAudioFrameCount(Double(buffer.frameLength) * ratio)
         guard let output = AVAudioPCMBuffer(pcmFormat: target, frameCapacity: outputFrames) else { return nil }
 

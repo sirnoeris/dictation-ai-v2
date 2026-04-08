@@ -10,23 +10,15 @@ struct PillView: View {
     @ObservedObject var settings: AppSettings
 
     var onSettingsTap: (() -> Void)?
-    var onDragChanged: ((CGPoint) -> Void)?
 
-    // Internal drag state
-    @State private var dragOffset: CGSize = .zero
-    @State private var localBarLevels: [Float] = [0.1, 0.15, 0.1, 0.12, 0.08]
-    @State private var idleBarTimer: Timer?
+    // Bug fix: pulseScale must start at 1.0 and animate to 1.35 on .onAppear
+    // to trigger the repeating pulse. Removing the dead idle timer too.
+    @State private var pulseAnimating = false
 
     var body: some View {
         pillContent
-            .gesture(
-                DragGesture(minimumDistance: 4)
-                    .onChanged { v in
-                        onDragChanged?(CGPoint(x: v.location.x, y: v.location.y))
-                    }
-            )
-            .onAppear { startIdleAnimation() }
-            .onDisappear { stopIdleAnimation() }
+        // Dragging is handled by DraggableHostingView in PillWindowController,
+        // which calls NSWindow.performDrag(with:). No SwiftUI gesture here.
     }
 
     // MARK: - Main Content
@@ -71,8 +63,15 @@ struct PillView: View {
                 Circle()
                     .fill(Color.red.opacity(0.2))
                     .frame(width: 28, height: 28)
-                    .scaleEffect(pulseScale)
-                    .animation(.easeInOut(duration: 0.9).repeatForever(), value: pulseScale)
+                    // Bug fix: animate from 1.0 → 1.35 on appear using .onAppear
+                    // so the animation value change actually triggers the spring.
+                    .scaleEffect(pulseAnimating ? 1.35 : 1.0)
+                    .animation(
+                        .easeInOut(duration: 0.9).repeatForever(autoreverses: true),
+                        value: pulseAnimating
+                    )
+                    .onAppear { pulseAnimating = true }
+                    .onDisappear { pulseAnimating = false }
                 WaveformView(
                     barLevels: appState.barLevels,
                     color: .red,
@@ -178,20 +177,6 @@ struct PillView: View {
         }
     }
 
-    @State private var pulseScale: CGFloat = 1.0
-
-    // MARK: - Idle bar animation (gentle low-amplitude movement when idle)
-
-    private func startIdleAnimation() {
-        idleBarTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { _ in
-            // Subtle random movement for idle state
-        }
-    }
-
-    private func stopIdleAnimation() {
-        idleBarTimer?.invalidate()
-        idleBarTimer = nil
-    }
 }
 
 // MARK: - NSVisualEffectView bridge

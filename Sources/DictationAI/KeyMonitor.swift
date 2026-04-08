@@ -26,7 +26,15 @@ final class KeyMonitor {
 
     private var currentMode: RecordingMode = .hold
     private var currentKeyCode: Int        = 63   // Globe/Fn default
-    private var holdActive                 = false
+
+    // Bug fix: holdActive is written on the CGEventTap thread and read/written
+    // on the main thread (updateMode/removeTap). Protect with a lock.
+    private let holdLock                   = NSLock()
+    private var _holdActive                = false
+    private var holdActive: Bool {
+        get { holdLock.withLock { _holdActive } }
+        set { holdLock.withLock { _holdActive = newValue } }
+    }
 
     // MARK: - Public API
 

@@ -15,17 +15,23 @@ actor GrokEnhancer {
 
     /// Returns cleaned text, or throws on network / API error.
     /// Callers should fall back to `rawText` on failure.
-    func enhance(_ rawText: String, settings: AppSettings) async throws -> String {
+    ///
+    /// Bug fix: takes individual String values (Sendable) rather than the
+    /// non-Sendable AppSettings class, so no actor-isolation warning.
+    func enhance(_ rawText: String,
+                 apiKey:  String,
+                 model:   String,
+                 prompt:  String) async throws -> String {
         let wordCount = rawText.split(separator: " ").count
-        guard settings.hasXAIKey else { return rawText }
+        guard !apiKey.trimmingCharacters(in: .whitespaces).isEmpty else { return rawText }
 
         // Skip cleanup for very short utterances — save latency
         guard wordCount > 5 else { return rawText }
 
         let body: [String: Any] = [
-            "model": settings.xaiModel,
+            "model": model,
             "messages": [
-                ["role": "system", "content": settings.enhancementPrompt],
+                ["role": "system", "content": prompt],
                 ["role": "user",   "content": rawText]
             ],
             "temperature": 0.2,
@@ -34,7 +40,7 @@ actor GrokEnhancer {
 
         var request = URLRequest(url: endpoint, timeoutInterval: 15)
         request.httpMethod = "POST"
-        request.setValue("Bearer \(settings.xaiApiKey.trimmingCharacters(in: .whitespaces))",
+        request.setValue("Bearer \(apiKey.trimmingCharacters(in: .whitespaces))",
                          forHTTPHeaderField: "Authorization")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = try JSONSerialization.data(withJSONObject: body)

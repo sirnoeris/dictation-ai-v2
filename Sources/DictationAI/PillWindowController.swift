@@ -1,9 +1,33 @@
 import AppKit
 import SwiftUI
 
+// MARK: - DraggableHostingView
+// Subclass NSHostingView so mouseDown on non-interactive SwiftUI areas
+// initiates a window drag via NSWindow.performDrag(with:).
+// Interactive SwiftUI elements (buttons) still consume their own events.
+
+private final class DraggableHostingView<Content: View>: NSHostingView<Content> {
+    weak var dragDelegate: PillWindowController?
+
+    override func mouseDown(with event: NSEvent) {
+        // Let SwiftUI handle the event first (buttons, gestures, etc.)
+        super.mouseDown(with: event)
+        // If SwiftUI didn't consume the mouseDown (no interactive element was hit),
+        // the call returns quickly. Either way, offer the drag to the window.
+        // NSWindow.performDrag only starts if the cursor is actually moving.
+        window?.performDrag(with: event)
+    }
+
+    override func mouseUp(with event: NSEvent) {
+        super.mouseUp(with: event)
+        // Save pill position after any drag completes
+        dragDelegate?.savePosition()
+    }
+}
+
 // MARK: - PillWindowController
 // Manages a non-activating NSPanel that floats above all windows.
-// The panel hosts the SwiftUI PillView via NSHostingView.
+// The panel hosts the SwiftUI PillView via DraggableHostingView.
 
 @MainActor
 final class PillWindowController {
@@ -38,26 +62,23 @@ final class PillWindowController {
         panel.hidesOnDeactivate       = false
         panel.becomesKeyOnlyIfNeeded  = true
         panel.collectionBehavior      = [.canJoinAllSpaces, .fullScreenAuxiliary]
-        panel.animationBehavior       = .utilityWindow
-        panel.isMovableByWindowBackground = false
+        panel.animationBehavior             = .utilityWindow
+        // isMovableByWindowBackground = false because we use DraggableHostingView
+        // which calls performDrag(with:) for proper position saving.
+        panel.isMovableByWindowBackground   = false
 
         let pillView = PillView(
             appState: appState,
             settings: settings,
             onSettingsTap: { [weak self] in
                 NotificationCenter.default.post(name: .openSettings, object: nil)
-            },
-            onDragChanged: { [weak self] _ in
-                // Dragging handled by NSWindow's built-in move
             }
         )
 
-        let hosting = NSHostingView(rootView: pillView)
-        hosting.wantsLayer = true
-        panel.contentView  = hosting
-
-        // Make the pill draggable
-        hosting.allowedTouchTypes = []
+        let hosting = DraggableHostingView(rootView: pillView)
+        hosting.wantsLayer    = true
+        hosting.dragDelegate  = self
+        panel.contentView     = hosting
 
         self.panel = panel
         position(at: CGPoint(x: settings.pillX, y: settings.pillY))

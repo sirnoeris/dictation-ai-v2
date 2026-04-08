@@ -196,7 +196,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             // 2 ── Enhance with xAI Grok
             var finalText = trimmed
             if settings.enhancementEnabled && settings.hasXAIKey {
-                finalText = (try? await GrokEnhancer.shared.enhance(trimmed, settings: settings)) ?? trimmed
+                // Extract Sendable strings before crossing into the actor
+                let key    = settings.xaiApiKey
+                let model  = settings.xaiModel
+                let prompt = settings.enhancementPrompt
+                finalText  = (try? await GrokEnhancer.shared.enhance(
+                    trimmed, apiKey: key, model: model, prompt: prompt
+                )) ?? trimmed
             }
 
             appState.setResult(finalText)
