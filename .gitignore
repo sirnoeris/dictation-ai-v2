@@ -1,0 +1,20 @@
+# Xcode
+*.xcodeproj/xcuserdata/
+*.xcworkspace/xcuserdata/
+DerivedData/
+build/
+dist/
+
+# Swift Package Manager
+.build/
+.swiftpm/
+
+# macOS
+.DS_Store
+*.DS_Store
+
+# API keys
+.env
+
+# XcodeGen output (regenerate with setup.sh)
+# DictationAI.xcodeproj/    ← keep this if you want to commit it

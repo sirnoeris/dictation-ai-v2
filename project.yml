@@ -1,0 +1,68 @@
+# XcodeGen project spec — run `xcodegen generate` to create DictationAI.xcodeproj
+# Install XcodeGen: brew install xcodegen
+
+name: DictationAI
+
+options:
+  bundleIdPrefix: com.sirnoeris
+  deploymentTarget:
+    macOS: "14.0"
+  xcodeVersion: "15.4"
+  createIntermediateGroups: true
+  generateEmptyDirectories: true
+  defaultConfig: Debug
+
+settings:
+  base:
+    PRODUCT_BUNDLE_IDENTIFIER: com.sirnoeris.DictationAI
+    PRODUCT_NAME: DictationAI
+    SWIFT_VERSION: "5.9"
+    MACOSX_DEPLOYMENT_TARGET: "14.0"
+    ENABLE_HARDENED_RUNTIME: YES
+    CODE_SIGN_STYLE: Automatic
+    DEVELOPMENT_TEAM: ""                  # Set to your Apple Team ID
+    CODE_SIGN_ENTITLEMENTS: Resources/DictationAI.entitlements
+    INFOPLIST_FILE: Resources/Info.plist
+    SWIFT_STRICT_CONCURRENCY: minimal     # avoids false positives in audio callbacks
+
+packages:
+  WhisperKit:
+    url: https://github.com/argmaxinc/WhisperKit.git
+    minVersion: 0.9.0
+
+targets:
+  DictationAI:
+    type: application
+    platform: macOS
+
+    sources:
+      - path: Sources/DictationAI
+        type: group
+
+    resources:
+      - path: Resources/Assets.xcassets
+
+    info:
+      path: Resources/Info.plist
+
+    entitlements:
+      path: Resources/DictationAI.entitlements
+
+    dependencies:
+      - package: WhisperKit
+        product: WhisperKit
+
+    settings:
+      base:
+        INFOPLIST_FILE: Resources/Info.plist
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+
+    scheme:
+      testTargets: []
+      gatherCoverageData: false
+
+configs:
+  Debug:
+    type: debug
+  Release:
+    type: release
