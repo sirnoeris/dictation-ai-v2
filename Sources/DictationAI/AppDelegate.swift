@@ -169,9 +169,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         SoundPlayer.shared.playStop()
         updateTrayIcon()
 
-        AudioRecorder.shared.stop { [weak self] url in
+        AudioRecorder.shared.stop { [weak self] samples in
             guard let self else { return }
-            Task { await self.runPipeline(audioFileURL: url) }
+            Task { await self.runPipeline(audioSamples: samples) }
         }
     }
 
@@ -179,12 +179,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         appState.isRecording ? stopRecording() : startRecording()
     }
 
-    private func runPipeline(audioFileURL: URL?) async {
+    private func runPipeline(audioSamples: [Float]?) async {
         defer {
             updateTrayIcon()
-            // Auto-hide pill after 2.5 s unless it was an error.
-            // Task { @MainActor } + Task.sleep replaces DispatchQueue.asyncAfter
-            // to satisfy Swift 6 actor-isolation rules.
             let delay: Double = appState.state.isError ? 4.0 : 2.5
             Task { @MainActor [weak self] in
                 try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
@@ -194,16 +191,16 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             }
         }
 
-        guard let url = audioFileURL else {
+        guard let samples = audioSamples else {
             appState.transition(to: .error("Audio capture failed"))
             SoundPlayer.shared.playError()
             return
         }
 
         do {
-            // 1 ── Transcribe with WhisperKit
+            // 1 ── Transcribe with WhisperKit (direct audioArray, no WAV file)
             let rawText = try await WhisperTranscriber.shared.transcribe(
-                audioFileURL: url,
+                audioSamples: samples,
                 language:     settings.language,
                 modelName:    settings.whisperModel
             )

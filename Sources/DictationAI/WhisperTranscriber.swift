@@ -61,7 +61,11 @@ final class WhisperTranscriber: ObservableObject {
 
     // MARK: - Transcribe
 
-    func transcribe(audioFileURL: URL,
+    /// Transcribe Float32 audio samples (16 kHz mono) directly.
+    /// Uses transcribe(audioArray:) which bypasses WAV file I/O and is
+    /// the most reliable path. Falls back to bare defaults if options
+    /// cause empty results (known WhisperKit quirk).
+    func transcribe(audioSamples: [Float],
                     language: String = "",
                     modelName: String = "base") async throws -> String {
 
@@ -74,33 +78,30 @@ final class WhisperTranscriber: ObservableObject {
             throw TranscribeError.modelNotReady
         }
 
+        print("[Whisper] Transcribing \(audioSamples.count) samples via audioArray")
+
         var options = DecodingOptions()
-        options.task = .transcribe
-        if !language.isEmpty {
-            options.language = language
-        }
-        options.usePrefillPrompt = true
+        options.task             = .transcribe
         options.skipSpecialTokens = true
+        if !language.isEmpty { options.language = language }
 
-        print("[Whisper] Transcribing: \(audioFileURL.lastPathComponent)")
-        let results = try await pipe.transcribe(
-            audioPath: audioFileURL.path,
-            decodeOptions: options
-        )
+        // Primary attempt
+        var result = try await pipe.transcribe(audioArray: audioSamples,
+                                               decodeOptions: options)
+        print("[Whisper] Primary result: \(result?.text.debugDescription ?? "nil")")
 
-        print("[Whisper] Raw results: \(results.count) result(s)")
-        for (i, r) in results.enumerated() {
-            print("[Whisper]   result[\(i)].text = \(r.text.debugDescription)")
-            print("[Whisper]   result[\(i)].segments = \(r.segments.map(\.text))")
+        // speak2-style fallback: if empty, retry with bare defaults
+        // (some DecodingOptions combinations trigger false no-speech detection)
+        if result?.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true {
+            print("[Whisper] Primary empty — retrying with default options")
+            result = try await pipe.transcribe(audioArray: audioSamples)
+            print("[Whisper] Fallback result: \(result?.text.debugDescription ?? "nil")")
         }
 
-        // Flatten segments, stripping WhisperKit no-speech special tokens.
-        // skipSpecialTokens=true handles most cases, but some model versions
-        // still emit [_blank_audio] / [BLANK_AUDIO] as segment text.
+        // Strip blank-audio special tokens
         let blankTokens: Set<String> = ["[_blank_audio]", "[blank_audio]"]
-
-        let text = results
-            .flatMap { $0.segments }
+        let raw = result?.segments ?? []
+        let text = raw
             .map { $0.text.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !blankTokens.contains($0.lowercased()) }
             .joined(separator: " ")

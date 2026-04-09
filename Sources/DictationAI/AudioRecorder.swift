@@ -97,8 +97,10 @@ final class AudioRecorder {
 
     // MARK: - Stop
 
-    /// Stop recording, write PCM to a temp WAV file, call completion on main thread.
-    func stop(completion: @escaping (URL?) -> Void) {
+    /// Stop recording and return raw Float32 samples at 16 kHz mono.
+    /// Bypasses WAV file I/O entirely — samples are passed directly to WhisperKit’s
+    /// transcribe(audioArray:) which is the most reliable path.
+    func stop(completion: @escaping ([Float]?) -> Void) {
         guard isRunning else {
             DispatchQueue.main.async { completion(nil) }
             return
@@ -111,10 +113,11 @@ final class AudioRecorder {
         // calls hit "HALB_IOThread::_Start: there already is a thread" and
         // produce no audio frames.
         engine.reset()
-        cachedConverter = nil   // converter must be recreated for fresh engine state
+        cachedConverter = nil   // must be recreated for fresh engine state
 
         let (samples, _) = collector.drain()
-        print("[AudioRecorder] Collected \(samples.count) samples (\(String(format: "%.1f", Double(samples.count) / 16000))s)")
+        let duration = String(format: "%.1f", Double(samples.count) / 16_000)
+        print("[AudioRecorder] Collected \(samples.count) samples (\(duration)s)")
 
         guard !samples.isEmpty else {
             print("[AudioRecorder] No samples — aborting")
@@ -122,11 +125,7 @@ final class AudioRecorder {
             return
         }
 
-        // Write to a temp WAV on a background queue
-        DispatchQueue.global(qos: .userInitiated).async {
-            let url = self.writePCMToFile(samples: samples)
-            DispatchQueue.main.async { completion(url) }
-        }
+        DispatchQueue.main.async { completion(samples) }
     }
 
     // MARK: - Processing
