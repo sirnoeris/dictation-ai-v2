@@ -11,7 +11,8 @@ DEST="/Applications/$APP_NAME"
 
 # Find the most recently modified debug build
 SRC=$(find ~/Library/Developer/Xcode/DerivedData -name "$APP_NAME" \
-        -path "*/Debug/*" 2>/dev/null \
+        -path "*/Build/Products/Debug/*" \
+        -not -path "*/Index.noindex/*" 2>/dev/null \
       | xargs ls -dt 2>/dev/null \
       | head -1)
 
