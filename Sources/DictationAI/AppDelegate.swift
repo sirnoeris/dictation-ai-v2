@@ -231,9 +231,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 SoundPlayer.shared.playPaste()
             }
 
-            // Clean up temp audio file
-            try? FileManager.default.removeItem(at: url)
-
         } catch {
             appState.transition(to: .error(error.localizedDescription))
             SoundPlayer.shared.playError()
