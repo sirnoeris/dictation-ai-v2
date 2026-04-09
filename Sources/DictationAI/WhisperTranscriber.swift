@@ -92,20 +92,34 @@ final class WhisperTranscriber: ObservableObject {
                                  .trimmingCharacters(in: .whitespacesAndNewlines)
         print("[Whisper] Primary result: \(primaryText.debugDescription)")
 
-        // speak2-style fallback: if empty, retry with bare defaults
+        // Fallback: retry with only skipSpecialTokens (no task/language constraints)
+        // Primary sometimes fails no-speech detection; simpler options often succeed.
         if primaryText.isEmpty {
-            print("[Whisper] Primary empty — retrying with default options")
-            results = try await pipe.transcribe(audioArray: audioSamples)
-            let fallback = results.compactMap { $0.text }.joined()
+            print("[Whisper] Primary empty — retrying with minimal options")
+            var fallbackOptions = DecodingOptions()
+            fallbackOptions.skipSpecialTokens = true
+            results = try await pipe.transcribe(audioArray: audioSamples,
+                                                decodeOptions: fallbackOptions)
+            let fallback = results.compactMap { $0.text }.joined(separator: " ")
+                                  .trimmingCharacters(in: .whitespacesAndNewlines)
             print("[Whisper] Fallback result: \(fallback.debugDescription)")
         }
 
-        // Strip blank-audio special tokens
+        // Strip blank-audio tokens and any residual WhisperKit timestamp tokens
+        // (e.g. <|startoftranscript|>, <|0.00|>, <|endoftext|>)
         let blankTokens: Set<String> = ["[_blank_audio]", "[blank_audio]"]
         let text = results
             .flatMap { $0.segments }
-            .map { $0.text.trimmingCharacters(in: .whitespacesAndNewlines) }
-            .filter { !blankTokens.contains($0.lowercased()) }
+            .map { seg -> String in
+                // Remove <|...|> special tokens that skipSpecialTokens may have missed
+                var t = seg.text
+                    .replacingOccurrences(of: "<\\|[^|]+\\|>",
+                                          with: "",
+                                          options: .regularExpression)
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                return t
+            }
+            .filter { !blankTokens.contains($0.lowercased()) && !$0.isEmpty }
             .joined(separator: " ")
             .trimmingCharacters(in: .whitespacesAndNewlines)
 
