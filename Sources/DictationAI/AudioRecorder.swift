@@ -53,13 +53,6 @@ final class AudioRecorder {
     func start() {
         guard !isRunning else { return }
 
-        // Defensive guard: AVAudioEngine records silence without error when mic
-        // permission isn't granted. Bail out early so the caller gets nil from stop().
-        guard AVCaptureDevice.authorizationStatus(for: .audio) == .authorized else {
-            print("[AudioRecorder] Microphone permission not granted — aborting start()")
-            return
-        }
-
         isRunning = true
 
         let input = engine.inputNode

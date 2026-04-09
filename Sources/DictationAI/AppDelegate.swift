@@ -30,9 +30,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         hookAudioLevel()
         observeSettingsNotification()
 
-        // Request microphone permission up-front via the native system dialog.
-        // Only triggers the dialog if status is .notDetermined — no custom alert at launch.
-        AVCaptureDevice.requestAccess(for: .audio) { _ in }
+        // Request microphone permission. Small delay ensures the app is fully
+        // initialised so the system dialog appears in front of other windows.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
+            AVCaptureDevice.requestAccess(for: .audio) { _ in }
+        }
 
         // Warm up WhisperKit in background so the first recording is fast
         Task {
