@@ -85,23 +85,25 @@ final class WhisperTranscriber: ObservableObject {
         options.skipSpecialTokens = true
         if !language.isEmpty { options.language = language }
 
-        // Primary attempt
-        var result = try await pipe.transcribe(audioArray: audioSamples,
-                                               decodeOptions: options)
-        print("[Whisper] Primary result: \(result?.text.debugDescription ?? "nil")")
+        // Primary attempt — transcribe(audioArray:) returns [TranscriptionResult]
+        var results = try await pipe.transcribe(audioArray: audioSamples,
+                                                decodeOptions: options)
+        let primaryText = results.compactMap { $0.text }.joined(separator: " ")
+                                 .trimmingCharacters(in: .whitespacesAndNewlines)
+        print("[Whisper] Primary result: \(primaryText.debugDescription)")
 
         // speak2-style fallback: if empty, retry with bare defaults
-        // (some DecodingOptions combinations trigger false no-speech detection)
-        if result?.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true {
+        if primaryText.isEmpty {
             print("[Whisper] Primary empty — retrying with default options")
-            result = try await pipe.transcribe(audioArray: audioSamples)
-            print("[Whisper] Fallback result: \(result?.text.debugDescription ?? "nil")")
+            results = try await pipe.transcribe(audioArray: audioSamples)
+            let fallback = results.compactMap { $0.text }.joined()
+            print("[Whisper] Fallback result: \(fallback.debugDescription)")
         }
 
         // Strip blank-audio special tokens
         let blankTokens: Set<String> = ["[_blank_audio]", "[blank_audio]"]
-        let raw = result?.segments ?? []
-        let text = raw
+        let text = results
+            .flatMap { $0.segments }
             .map { $0.text.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !blankTokens.contains($0.lowercased()) }
             .joined(separator: " ")
