@@ -19,9 +19,9 @@ settings:
     SWIFT_VERSION: "5.9"
     MACOSX_DEPLOYMENT_TARGET: "14.0"
     ENABLE_HARDENED_RUNTIME: YES
+    GENERATE_INFOPLIST_FILE: NO
     CODE_SIGN_STYLE: Automatic
     DEVELOPMENT_TEAM: "N45LWC7W98"
-    INFOPLIST_FILE: Resources/Info.plist
     SWIFT_STRICT_CONCURRENCY: minimal     # avoids false positives in audio callbacks
 
 packages:
@@ -40,9 +40,6 @@ targets:
 
     resources:
       - path: Resources/Assets.xcassets
-
-    info:
-      path: Resources/Info.plist
 
     entitlements:
       path: Resources/DictationAI.entitlements
