@@ -139,13 +139,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     func startRecording() {
         guard !appState.isBusy else { return }
 
-        // Gate on microphone permission — bail out and prompt if not yet granted
-        let micStatus = AVCaptureDevice.authorizationStatus(for: .audio)
-        guard micStatus == .authorized else {
-            requestMicrophonePermission()
-            return
-        }
-
         // Snapshot the frontmost app before the pill appears
         PasteService.shared.captureFrontApp()
 
@@ -228,41 +221,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         } catch {
             appState.transition(to: .error(error.localizedDescription))
             SoundPlayer.shared.playError()
-        }
-    }
-
-    // MARK: - Microphone Permission
-
-    private func requestMicrophonePermission() {
-        switch AVCaptureDevice.authorizationStatus(for: .audio) {
-        case .authorized:
-            break
-        case .notDetermined:
-            AVCaptureDevice.requestAccess(for: .audio) { [weak self] granted in
-                if !granted {
-                    DispatchQueue.main.async { self?.showMicDeniedAlert() }
-                }
-            }
-        default:
-            // .denied or .restricted — permission was explicitly refused
-            showMicDeniedAlert()
-        }
-    }
-
-    private func showMicDeniedAlert() {
-        let alert = NSAlert()
-        alert.messageText     = "Microphone Access Required"
-        alert.informativeText = """
-            Dictation AI needs microphone access to transcribe your speech.
-
-            Open System Settings → Privacy & Security → Microphone and enable Dictation AI.
-            """
-        alert.addButton(withTitle: "Open System Settings")
-        alert.addButton(withTitle: "Later")
-        if alert.runModal() == .alertFirstButtonReturn {
-            NSWorkspace.shared.open(
-                URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone")!
-            )
         }
     }
 
