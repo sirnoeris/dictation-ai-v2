@@ -30,10 +30,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         hookAudioLevel()
         observeSettingsNotification()
 
-        // Request microphone permission up-front.
-        // AVAudioEngine records silence without prompting if permission isn't granted,
-        // leading to "(nothing detected)" with no feedback to the user.
-        requestMicrophonePermission()
+        // Request microphone permission up-front via the native system dialog.
+        // Only triggers the dialog if status is .notDetermined — no custom alert at launch.
+        AVCaptureDevice.requestAccess(for: .audio) { _ in }
 
         // Warm up WhisperKit in background so the first recording is fast
         Task {
@@ -50,13 +49,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             }
         }
 
-        // Request accessibility if auto-paste is on
-        if settings.autoPaste {
-            Task { @MainActor in
-                try? await Task.sleep(nanoseconds: 1_500_000_000)
-                PasteService.shared.requestAccessibilityIfNeeded()
-            }
-        }
+        // Accessibility is requested lazily when the first paste fails,
+        // not proactively at launch — avoids the popup every time the binary changes.
     }
 
     func applicationWillTerminate(_ notification: Notification) {
