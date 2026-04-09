@@ -82,10 +82,17 @@ final class WhisperTranscriber: ObservableObject {
         options.usePrefillPrompt = true
         options.skipSpecialTokens = true
 
+        print("[Whisper] Transcribing: \(audioFileURL.lastPathComponent)")
         let results = try await pipe.transcribe(
             audioPath: audioFileURL.path,
             decodeOptions: options
         )
+
+        print("[Whisper] Raw results: \(results.count) result(s)")
+        for (i, r) in results.enumerated() {
+            print("[Whisper]   result[\(i)].text = \(r.text.debugDescription)")
+            print("[Whisper]   result[\(i)].segments = \(r.segments.map(\.text))")
+        }
 
         // Flatten segments, stripping WhisperKit no-speech special tokens.
         // skipSpecialTokens=true handles most cases, but some model versions
@@ -99,6 +106,7 @@ final class WhisperTranscriber: ObservableObject {
             .joined(separator: " ")
             .trimmingCharacters(in: .whitespacesAndNewlines)
 
+        print("[Whisper] Final text: \(text.debugDescription)")
         return text
     }
 

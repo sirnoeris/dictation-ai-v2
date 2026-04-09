@@ -106,10 +106,18 @@ final class AudioRecorder {
         isRunning = false
         engine.inputNode.removeTap(onBus: 0)
         engine.stop()
+        // reset() clears internal HAL I/O thread state so the engine can be
+        // restarted cleanly on the next recording. Without this, subsequent
+        // calls hit "HALB_IOThread::_Start: there already is a thread" and
+        // produce no audio frames.
+        engine.reset()
+        cachedConverter = nil   // converter must be recreated for fresh engine state
 
         let (samples, _) = collector.drain()
+        print("[AudioRecorder] Collected \(samples.count) samples (\(String(format: "%.1f", Double(samples.count) / 16000))s)")
 
         guard !samples.isEmpty else {
+            print("[AudioRecorder] No samples — aborting")
             DispatchQueue.main.async { completion(nil) }
             return
         }
