@@ -20,7 +20,7 @@ settings:
     MACOSX_DEPLOYMENT_TARGET: "14.0"
     ENABLE_HARDENED_RUNTIME: YES
     CODE_SIGN_STYLE: Automatic
-    DEVELOPMENT_TEAM: ""                  # Set to your Apple Team ID
+    DEVELOPMENT_TEAM: "N45LWC7W98"
     INFOPLIST_FILE: Resources/Info.plist
     SWIFT_STRICT_CONCURRENCY: minimal     # avoids false positives in audio callbacks
 
