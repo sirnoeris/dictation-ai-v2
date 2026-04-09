@@ -57,6 +57,13 @@ targets:
         GENERATE_INFOPLIST_FILE: NO
         CODE_SIGN_ENTITLEMENTS: Resources/DictationAI.entitlements
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+      configs:
+        Debug:
+          # Hardened Runtime is OFF for debug builds:
+          # - mic/accessibility TCC dialogs work from NSMicrophoneUsageDescription alone
+          # - Xcode debugger attaches cleanly (no task-port errors)
+          # - entitlements file not required for signing
+          ENABLE_HARDENED_RUNTIME: NO
 
     scheme:
       testTargets: []
