@@ -44,7 +44,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // First launch: open settings if no API key.
         // Use Task instead of DispatchQueue.asyncAfter — DispatchQueue closures
         // are not @MainActor-isolated in Swift 6, causing the compiler error.
-        if !settings.hasXAIKey {
+        if !settings.hasAPIKey {
             Task { @MainActor [weak self] in
                 try? await Task.sleep(nanoseconds: 800_000_000)
                 self?.openSettings()
@@ -200,15 +200,17 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 return
             }
 
-            // 2 ── Enhance with xAI Grok
+            // 2 ── Enhance with LLM (xAI, OpenRouter, or custom provider)
             var finalText = trimmed
-            if settings.enhancementEnabled && settings.hasXAIKey {
-                // Extract Sendable strings before crossing into the actor
-                let key    = settings.xaiApiKey
-                let model  = settings.xaiModel
-                let prompt = settings.enhancementPrompt
+            if settings.enhancementEnabled && settings.hasAPIKey {
+                // Extract Sendable values before crossing into the actor
+                let key         = settings.llmApiKey
+                let model       = settings.llmModel
+                let prompt      = settings.enhancementPrompt
+                let endpointURL = settings.completionsURL
                 finalText  = (try? await GrokEnhancer.shared.enhance(
-                    trimmed, apiKey: key, model: model, prompt: prompt
+                    trimmed, apiKey: key, model: model, prompt: prompt,
+                    endpointURL: endpointURL
                 )) ?? trimmed
             }
 

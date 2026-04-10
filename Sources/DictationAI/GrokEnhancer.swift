@@ -1,27 +1,27 @@
 import Foundation
 
-// MARK: - GrokEnhancer
-// Calls xAI's OpenAI-compatible chat completions endpoint to clean up raw
+// MARK: - LLMEnhancer
+// Calls any OpenAI-compatible chat completions endpoint to clean up raw
 // dictation text: fix punctuation, remove fillers, normalise casing.
+// Works with xAI, OpenRouter, or any custom provider.
 
 actor GrokEnhancer {
 
     static let shared = GrokEnhancer()
     private init() {}
 
-    private let endpoint = URL(string: "https://api.x.ai/v1/chat/completions")!
-
     // MARK: - Enhance
 
     /// Returns cleaned text, or throws on network / API error.
     /// Callers should fall back to `rawText` on failure.
     ///
-    /// Bug fix: takes individual String values (Sendable) rather than the
-    /// non-Sendable AppSettings class, so no actor-isolation warning.
+    /// The `endpointURL` parameter allows any OpenAI-compatible provider
+    /// (xAI, OpenRouter, local Ollama, etc.).
     func enhance(_ rawText: String,
-                 apiKey:  String,
-                 model:   String,
-                 prompt:  String) async throws -> String {
+                 apiKey:     String,
+                 model:      String,
+                 prompt:     String,
+                 endpointURL: URL) async throws -> String {
         let wordCount = rawText.split(separator: " ").count
         guard !apiKey.trimmingCharacters(in: .whitespaces).isEmpty else { return rawText }
 
@@ -38,7 +38,7 @@ actor GrokEnhancer {
             "max_tokens": 1024
         ]
 
-        var request = URLRequest(url: endpoint, timeoutInterval: 15)
+        var request = URLRequest(url: endpointURL, timeoutInterval: 15)
         request.httpMethod = "POST"
         request.setValue("Bearer \(apiKey.trimmingCharacters(in: .whitespaces))",
                          forHTTPHeaderField: "Authorization")
@@ -48,11 +48,11 @@ actor GrokEnhancer {
         let (data, response) = try await URLSession.shared.data(for: request)
 
         guard let http = response as? HTTPURLResponse else {
-            throw GrokError.invalidResponse
+            throw LLMError.invalidResponse
         }
         guard (200..<300).contains(http.statusCode) else {
             let body = String(data: data, encoding: .utf8) ?? ""
-            throw GrokError.httpError(http.statusCode, body)
+            throw LLMError.httpError(http.statusCode, body)
         }
 
         guard let json    = try JSONSerialization.jsonObject(with: data) as? [String: Any],
@@ -60,7 +60,7 @@ actor GrokEnhancer {
               let first   = choices.first,
               let message = first["message"] as? [String: Any],
               let content = message["content"] as? String else {
-            throw GrokError.malformedResponse
+            throw LLMError.malformedResponse
         }
 
         let cleaned = content.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -69,16 +69,16 @@ actor GrokEnhancer {
 
     // MARK: - Errors
 
-    enum GrokError: LocalizedError {
+    enum LLMError: LocalizedError {
         case invalidResponse
         case httpError(Int, String)
         case malformedResponse
 
         var errorDescription: String? {
             switch self {
-            case .invalidResponse:           return "Invalid response from xAI API."
-            case .httpError(let c, let b):   return "xAI API error \(c): \(b.prefix(200))"
-            case .malformedResponse:         return "Unexpected xAI response format."
+            case .invalidResponse:           return "Invalid response from LLM API."
+            case .httpError(let c, let b):   return "LLM API error \(c): \(b.prefix(200))"
+            case .malformedResponse:         return "Unexpected LLM response format."
             }
         }
     }

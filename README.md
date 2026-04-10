@@ -1,7 +1,7 @@
 # 🎙 Dictation AI v2
 
 > Native macOS Swift app — hold Fn/Globe, speak, text appears at your cursor.
-> On-device transcription via **WhisperKit**. Smart cleanup via **xAI Grok**.
+> On-device transcription via **WhisperKit**. Smart cleanup via **any OpenAI-compatible LLM** (xAI, OpenRouter, or custom).
 
 Built as a complete rewrite of [v1 (Electron)](https://github.com/sirnoeris/dictation-ai) using native macOS APIs: WhisperKit + SwiftUI + CGEventTap.
 
@@ -25,7 +25,7 @@ Built as a complete rewrite of [v1 (Electron)](https://github.com/sirnoeris/dict
 - **Hold-to-talk or toggle mode** — hold Fn/Globe (or any key), release to transcribe
 - **On-device transcription** — WhisperKit runs Whisper via CoreML on Apple Silicon
 - **Live audio waveform** — animated bars respond to your voice while recording
-- **AI cleanup** — Grok removes fillers, fixes punctuation (skip if ≤5 words)
+- **Multi-provider AI cleanup** — xAI Grok, OpenRouter (free models), or any OpenAI-compatible API
 - **Auto-paste** — text lands at your cursor via CGEvent Cmd+V simulation
 - **Draggable pill UI** — floating translucent pill, position remembered across relaunches
 - **Sound cues** — subtle macOS system sounds on start, stop, paste
@@ -68,9 +68,19 @@ Add **Dictation AI** and enable it.
 
 Prompted automatically on first recording.
 
-### 4. xAI API key (optional)
+### 4. AI Cleanup API Key (optional)
 
-Get a free key at [console.x.ai](https://console.x.ai) for Grok text cleanup. The app works without it — just no cleanup step.
+Choose your provider in Settings:
+
+| Provider | Get a key | Cost |
+|----------|-----------|------|
+| **OpenRouter** (recommended) | [openrouter.ai/keys](https://openrouter.ai/keys) | Free (no credit card needed) |
+| xAI | [console.x.ai](https://console.x.ai) | ~$0.01–0.15/month |
+| Custom | Any OpenAI-compatible endpoint | Varies |
+
+**OpenRouter free tier** gives you access to models like Llama 3.3 70B, Gemma 3 27B, and more at zero cost. Rate limits: 20 req/min, 200 req/day.
+
+The app works without any key — just no cleanup step.
 
 ---
 
@@ -84,7 +94,7 @@ Sources/DictationAI/
 ├── AppState.swift                @Observable state machine (idle/recording/processing/done)
 ├── AudioRecorder.swift           AVAudioEngine → 16 kHz mono PCM → temp WAV
 ├── WhisperTranscriber.swift      WhisperKit wrapper (lazy model load, DecodingOptions)
-├── GrokEnhancer.swift            xAI REST API client (OpenAI-compatible)
+├── GrokEnhancer.swift            LLM API client (any OpenAI-compatible provider)
 ├── KeyMonitor.swift              CGEventTap — Fn/Globe flagsChanged + keyDown
 ├── PasteService.swift            CGEvent Cmd+V auto-paste, tracks previous front app
 ├── SoundPlayer.swift             macOS system sounds via AudioToolbox
@@ -100,7 +110,7 @@ Sources/DictationAI/
 2. `AVAudioEngine` tap captures 16 kHz mono PCM into thread-safe buffer
 3. Fn/Globe release → stop engine, write buffer to temp WAV
 4. `WhisperKit.transcribe()` → raw text
-5. `GrokEnhancer.enhance()` → cleaned text (if xAI key present & >5 words)
+5. `LLMEnhancer.enhance()` → cleaned text (if API key present & >5 words)
 6. Write to clipboard → CGEvent Cmd+V → restore previous clipboard after 3 s
 7. Pill auto-hides after 2.5 s
 
@@ -111,8 +121,9 @@ Sources/DictationAI/
 | Setting | Default | Description |
 |---------|---------|-------------|
 | Whisper model | `base` | `tiny` → fast, `large-v3` → accurate |
-| xAI API key | — | Optional; enables Grok cleanup |
-| Grok model | `grok-3-mini` | Fast and cheap |
+| LLM Provider | xAI | xAI, OpenRouter, or Custom |
+| API key | — | Optional; enables AI cleanup |
+| Model | `grok-3-mini` / `openrouter/free` | Depends on provider |
 | Cleanup prompt | Built-in | Customisable |
 | Recording mode | Hold | Hold or Toggle |
 | Hold key | Fn / Globe | Any modifier key |
@@ -151,6 +162,7 @@ xcodebuild -exportArchive \
 | Component | Cost |
 |-----------|------|
 | WhisperKit transcription | Free (on-device) |
+| OpenRouter cleanup (free models) | Free |
 | xAI Grok cleanup | ~$0.01–0.15/month at typical usage |
 
 ---

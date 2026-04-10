@@ -31,7 +31,7 @@ struct SettingsView: View {
             Divider().opacity(0.3)
             footer
         }
-        .frame(width: 520, height: 620)
+        .frame(width: 520, height: 680)
         .background(Color(NSColor.windowBackgroundColor))
         .onAppear {
             learnButtonLabel = settings.holdKeyLabel
@@ -56,7 +56,7 @@ struct SettingsView: View {
             Text("Dictation AI")
                 .font(.title2.bold())
             Spacer()
-            Text("v2.0  ·  Swift + WhisperKit")
+            Text("v2.1  ·  Swift + WhisperKit")
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
@@ -106,25 +106,64 @@ struct SettingsView: View {
 
     private var enhancementSection: some View {
         SettingsSection(title: "AI Text Cleanup") {
-            SettingsRow(label: "Enable Grok cleanup") {
+            SettingsRow(label: "Enable AI cleanup") {
                 Toggle("", isOn: $settings.enhancementEnabled)
                     .labelsHidden()
             }
 
             if settings.enhancementEnabled {
-                SettingsRow(label: "xAI API key") {
-                    SecureField("sk-…", text: $settings.xaiApiKey)
+                SettingsRow(label: "Provider") {
+                    Picker("", selection: $settings.llmProvider) {
+                        ForEach(LLMProvider.allCases) { provider in
+                            Text(provider.label).tag(provider)
+                        }
+                    }
+                    .frame(width: 220)
+                }
+
+                SettingsRow(label: "API key") {
+                    SecureField(settings.llmProvider.keyPlaceholder,
+                                text: $settings.llmApiKey)
                         .textFieldStyle(.roundedBorder)
                         .frame(width: 220)
                 }
 
-                SettingsRow(label: "Model") {
-                    Picker("", selection: $settings.xaiModel) {
-                        ForEach(AppSettings.grokModels, id: \.self) { m in
-                            Text(m).tag(m)
-                        }
+                if settings.llmProvider == .custom {
+                    SettingsRow(label: "Base URL") {
+                        TextField("https://api.example.com/v1",
+                                  text: $settings.llmBaseURL)
+                            .textFieldStyle(.roundedBorder)
+                            .frame(width: 220)
+                            .help("OpenAI-compatible base URL (without /chat/completions)")
                     }
-                    .frame(width: 180)
+                }
+
+                SettingsRow(label: "Model") {
+                    if settings.llmProvider.defaultModels.isEmpty {
+                        // Custom provider: free-form text field
+                        TextField("model-name", text: $settings.llmModel)
+                            .textFieldStyle(.roundedBorder)
+                            .frame(width: 220)
+                            .help("Enter the model ID for your provider")
+                    } else {
+                        Picker("", selection: $settings.llmModel) {
+                            ForEach(settings.llmProvider.defaultModels, id: \.self) { m in
+                                Text(m).tag(m)
+                            }
+                        }
+                        .frame(width: 220)
+                    }
+                }
+
+                if settings.llmProvider == .openrouter {
+                    HStack(spacing: 6) {
+                        Image(systemName: "info.circle")
+                            .font(.caption)
+                            .foregroundStyle(Color.accentColor)
+                        Text("Free models have rate limits (20 req/min, 200/day). No credit card needed.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
                 }
 
                 VStack(alignment: .leading, spacing: 6) {
@@ -248,7 +287,8 @@ struct SettingsView: View {
 
     private var footer: some View {
         HStack {
-            Link("Get xAI key →", destination: URL(string: "https://console.x.ai")!)
+            Link(settings.llmProvider.keyLinkLabel,
+                 destination: settings.llmProvider.keyURL)
                 .font(.caption)
             Spacer()
             Button("Done") { dismiss() }
